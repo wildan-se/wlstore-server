@@ -67,21 +67,15 @@ exports.addToCart = (req, res) => {
 exports.removeFromCart = (req, res) => {
   const id = Number(req.params.id);
   const productCode = String(req.params.product);
+  console.log("Remove from cart:", { user_id: id, productCode }); // Debugging
 
-  Order.updateOne(
-    {
-      user_id: id,
-    },
-    {
-      $pull: {
-        cart_items: productCode,
-      },
-    }
-  )
+  Order.updateOne({ user_id: id }, { $pull: { cart_items: productCode } })
     .then((result) => {
+      console.log("Update result:", result); // Debugging
       res.send(result);
     })
     .catch((err) => {
+      console.error("Error removing product:", err); // Debugging
       res.status(409).send({
         message: err.message,
       });
