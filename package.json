@@ -4,7 +4,9 @@
   "description": "wlstore-server",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js",
+    "dev": "nodemon app.js"
   },
   "keywords": [
     "node.js",
@@ -18,6 +20,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.1",
-    "mongoose": "^5.13.22"
+    "mongoose": "^5.13.22",
+    "nodemon": "^3.1.10"
   }
 }
