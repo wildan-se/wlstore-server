@@ -1,17 +1,27 @@
-// Mengeksport fungsi yang menerima aplikasi Express (app) sebagai parameter
+// app/routes/product.route.js
 module.exports = (app) => {
-  // Mengimpor controller untuk mengelola permintaan terkait produk
   const products = require("../controllers/product.controller");
-
-  // Membuat instance Router dari Express untuk mendefinisikan rute
   const router = require("express").Router();
+  const upload = app.get("upload");
+  const { verifyToken, isAdmin } = require("../middleware/authJwt"); // Import middleware
 
-  // Menambahkan rute untuk mendapatkan semua produk
-  router.get("/", products.findAll); // Menangani permintaan GET untuk mendapatkan semua produk
+  // Rute Publik (tidak perlu otentikasi)
+  router.get("/", products.findAll);
+  router.get("/:id", products.findOne);
 
-  // Menambahkan rute untuk mendapatkan satu produk berdasarkan ID produk
-  router.get("/:id", products.findOne); // Menangani permintaan GET untuk mendapatkan produk berdasarkan ID
+  // Rute Admin (membutuhkan token dan peran admin)
+  // Urutan middleware penting: verifyToken dulu, baru isAdmin
+  router.post(
+    "/",
+    [verifyToken, isAdmin, upload.single("image")],
+    products.create
+  );
+  router.put(
+    "/:id",
+    [verifyToken, isAdmin, upload.single("image")],
+    products.update
+  );
+  router.delete("/:id", [verifyToken, isAdmin], products.delete); // Tidak ada file upload untuk delete
 
-  // Menggunakan router dengan prefix '/api/products' pada aplikasi Express
-  app.use("/api/products", router); // Semua rute akan diawali dengan '/api/products'
+  app.use("/api/products", router);
 };

@@ -1,26 +1,29 @@
-// Mengeksport fungsi yang menerima mongoose sebagai parameter dan mengembalikan model Product
 module.exports = (mongoose) => {
-  // Mendefinisikan skema untuk koleksi 'products' menggunakan mongoose.Schema
-  const schema = mongoose.Schema({
-    code: String, // Kode unik produk
-    name: String, // Nama produk
-    price: Number, // Harga produk
-    description: String, // Deskripsi produk
-    imageUrl: String, // URL gambar produk
-    averageRating: Number, // Rating rata-rata produk
-  });
+  const schema = mongoose.Schema(
+    {
+      code: { type: String, required: true, unique: true, index: true },
+      name: { type: String, required: true, index: true },
+      price: { type: Number, required: true, min: 0, index: true },
+      description: String,
+      imageUrl: String,
+      averageRating: { type: Number, min: 0, max: 5, default: 0, index: true },
+      stock: { type: Number, required: true, min: 0, default: 0, index: true },
+    },
+    {
+      timestamps: true, // Add createdAt and updatedAt automatically
+    }
+  );
 
-  // Menambahkan metode 'toJSON' untuk mengubah cara objek dikembalikan dalam format JSON
+  // Add compound indexes for better query performance
+  schema.index({ price: 1, averageRating: -1 });
+  schema.index({ name: "text", description: "text" }); // Text search index
+
   schema.method("toJSON", function () {
-    // Menghapus properti __v dan _id, dan menggantikan _id dengan id dalam objek hasil
     const { __v, _id, ...object } = this.toObject();
-    object.id = _id; // Menambahkan properti 'id' untuk menggantikan '_id'
-    return object; // Mengembalikan objek yang telah dimodifikasi
+    object.id = _id;
+    return object;
   });
 
-  // Membuat model 'Product' berdasarkan skema yang telah didefinisikan
   const Product = mongoose.model("products", schema);
-
-  // Mengembalikan model 'Product' untuk digunakan di file lain
   return Product;
 };

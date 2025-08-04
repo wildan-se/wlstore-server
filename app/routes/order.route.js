@@ -1,18 +1,32 @@
-// Mengeksport fungsi yang menerima aplikasi Express (app) sebagai parameter
+// app/routes/order.route.js
 module.exports = (app) => {
-  // Mengimpor controller untuk mengelola permintaan terkait pesanan
   const orders = require("../controllers/order.controller");
-
-  // Membuat instance Router dari Express untuk mendefinisikan rute
   const router = require("express").Router();
+  const { verifyToken } = require("../middleware/authJwt"); // Import middleware
 
-  // Menambahkan rute untuk mendapatkan pesanan berdasarkan ID pengguna
-  router.get("/user/:id", orders.findOrder);
-  // Menambahkan rute untuk menambahkan produk ke keranjang pengguna berdasarkan ID pengguna
-  router.post("/user/:id/add", orders.addToCart);
-  // Menambahkan rute untuk menghapus produk dari keranjang berdasarkan ID pengguna dan kode produk
-  router.delete("/user/:id/product/:product", orders.removeFromCart);
+  // Rute untuk mendapatkan keranjang belanja pengguna (membutuhkan otentikasi)
+  router.get("/cart", [verifyToken], orders.findUserCart);
 
-  // Menggunakan router dengan prefix '/api/orders' pada aplikasi Express
+  // Rute untuk menambah/memperbarui item ke keranjang (membutuhkan otentikasi)
+  router.post("/cart/add", [verifyToken], orders.addToCart);
+
+  // Rute untuk memperbarui kuantitas item di keranjang (membutuhkan otentikasi)
+  router.put(
+    "/cart/update-quantity",
+    [verifyToken],
+    orders.updateCartItemQuantity
+  );
+
+  // Rute untuk menghapus item dari keranjang (membutuhkan otentikasi)
+  router.post("/cart/remove", [verifyToken], orders.removeFromCart);
+  // Atau jika Anda ingin menggunakan DELETE method:
+  // router.delete("/cart/remove/:productCode", [verifyToken], orders.removeFromCart);
+
+  // Rute lain yang mungkin sudah ada (misalnya untuk manajemen pesanan admin)
+  // router.get("/", orders.findAll); // Contoh: untuk admin melihat semua order
+  // router.get("/:id", orders.findOne); // Contoh: untuk admin melihat detail order
+  // router.put("/:id", orders.update); // Contoh: untuk admin mengubah status order
+  // router.delete("/:id", orders.delete); // Contoh: untuk admin menghapus order
+
   app.use("/api/orders", router);
 };

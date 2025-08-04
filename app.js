@@ -1,62 +1,100 @@
-// Mengimpor module Express untuk membuat aplikasi server
+// app.js
 const express = require("express");
-// Membuat instance aplikasi Express
 const app = express();
-
-// Mengimpor module path untuk menangani path file
 const path = require("path");
-// Mengimpor module CORS untuk mengizinkan permintaan lintas domain
 const cors = require("cors");
-// Menentukan port yang akan digunakan untuk server
-const PORT = process.env.PORT || 8000; // Jika variabel lingkungan PORT tidak ada, default ke 8000
+const dotenv = require("dotenv");
+const multer = require("multer");
 
-// Middleware untuk mengonfigurasi aplikasi agar menerima format JSON pada body request
+dotenv.config();
+
+const PORT = process.env.PORT || 8001;
+
 app.use(express.json());
-// Middleware untuk mengonfigurasi aplikasi agar dapat menerima data URL-encoded (misalnya formulir)
 app.use(express.urlencoded({ extended: true }));
-// Menyajikan file gambar statis dari folder 'public/img' ketika diakses melalui /img
+
 app.use("/img", express.static(path.join(__dirname, "./public/img")));
-// Menggunakan CORS middleware untuk memungkinkan permintaan lintas domain
-app.use(cors());
-// Middleware untuk menambahkan header CORS khusus pada setiap respons
-app.use(function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*"); // Mengizinkan semua domain mengakses server
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept" // Menentukan header yang diizinkan dalam permintaan
-  );
-  next(); // Melanjutkan ke middleware berikutnya
+app.use("/uploads", express.static(path.join(__dirname, "./public/uploads")));
+
+const corsOptions = {
+  origin: "*",
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: false,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, "public", "uploads");
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+    );
+  },
 });
 
-// Mengimpor konfigurasi database dan menghubungkan ke MongoDB menggunakan Mongoose
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only image files are allowed!"), false);
+    }
+    cb(null, true);
+  },
+});
+
+app.set("upload", upload);
+
 const db = require("./app/models");
-// Menghubungkan ke MongoDB dengan pengaturan koneksi yang diperlukan
 db.mongoose
-  .connect(db.url, {
-    useNewUrlParser: true, // Menggunakan URL parser baru
-    useUnifiedTopology: true, // Menggunakan koneksi topology yang lebih stabil
-    useFindAndModify: false, // Menonaktifkan penggunaan findAndModify yang sudah deprecated
-  })
-  .then((result) => {
-    console.log("connect to database"); // Jika koneksi berhasil
+  .connect(db.url, db.options)
+  .then(() => {
+    console.log("Connected to the database!");
+    // Opsional: Untuk seeding awal user admin jika belum ada
+    // db.users.estimatedDocumentCount().then((count) => {
+    //   if (count === 0) {
+    //     console.log("No users found. Seeding initial admin user...");
+    //     const bcrypt = require("bcryptjs");
+    //     const User = db.users;
+    //     const adminUser = new User({
+    //       username: "admin",
+    //       email: "admin@example.com",
+    //       password: bcrypt.hashSync(
+    //         process.env.ADMIN_PASSWORD || "qwerty123",
+    //         8
+    //       ),
+    //       roles: ["admin"],
+    //     });
+    //     adminUser
+    //       .save()
+    //       .then(() => console.log("Default admin user created."))
+    //       .catch((err) =>
+    //         console.error("Error creating default admin user:", err)
+    //       );
+    //   }
+    // });
   })
   .catch((err) => {
-    console.error("Connection error:", err); // Menangani kesalahan koneksi ke database
-    process.exit(); // Menutup aplikasi jika koneksi gagal
+    console.error("Connection error:", err);
+    process.exit(1);
   });
 
-// Rute dasar untuk mengembalikan pesan sambutan ketika mengakses root URL
 app.get("/", (req, res) => {
   res.json({
-    message: "welcome wlstore-server", // Pesan sambutan untuk aplikasi
+    message: "Welcome to WLstore API!",
   });
 });
 
-// Mengimpor dan mengonfigurasi rute untuk produk dan pesanan
-require("./app/routes/product.route")(app); // Mengonfigurasi rute produk
-require("./app/routes/order.route")(app); // Mengonfigurasi rute pesanan
+require("./app/routes/auth.route")(app); // Tambahkan rute autentikasi
+require("./app/routes/product.route")(app);
+require("./app/routes/order.route")(app);
 
-// Menjalankan server pada port yang ditentukan dan mencetak pesan ketika server siap
 app.listen(PORT, () => {
-  console.log(`Server is running on port http://localhost:${PORT}`); // Menampilkan pesan saat server aktif
+  console.log(`Server is running on port http://localhost:${PORT}`);
 });
