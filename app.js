@@ -56,29 +56,35 @@ db.mongoose
   .connect(db.url, db.options)
   .then(() => {
     console.log("Connected to the database!");
-    // Opsional: Untuk seeding awal user admin jika belum ada
-    // db.users.estimatedDocumentCount().then((count) => {
-    //   if (count === 0) {
-    //     console.log("No users found. Seeding initial admin user...");
-    //     const bcrypt = require("bcryptjs");
-    //     const User = db.users;
-    //     const adminUser = new User({
-    //       username: "admin",
-    //       email: "admin@example.com",
-    //       password: bcrypt.hashSync(
-    //         process.env.ADMIN_PASSWORD || "qwerty123",
-    //         8
-    //       ),
-    //       roles: ["admin"],
-    //     });
-    //     adminUser
-    //       .save()
-    //       .then(() => console.log("Default admin user created."))
-    //       .catch((err) =>
-    //         console.error("Error creating default admin user:", err)
-    //       );
-    //   }
-    // });
+
+    // Seed admin user if no users exist
+    db.users.estimatedDocumentCount().then((count) => {
+      if (count === 0) {
+        console.log("No users found. Seeding initial admin user...");
+        const bcrypt = require("bcryptjs");
+        const User = db.users;
+        const adminUser = new User({
+          username: "admin",
+          email: "admin@wlstore.com",
+          name: "Administrator",
+          phone: "08123456789",
+          password: bcrypt.hashSync("admin123", 8),
+          roles: ["admin", "user"],
+          isActive: true,
+        });
+        adminUser
+          .save()
+          .then(() => {
+            console.log("✅ Default admin user created:");
+            console.log("📧 Email: admin@wlstore.com");
+            console.log("🔑 Password: admin123");
+            console.log("👤 Username: admin");
+          })
+          .catch((err) =>
+            console.error("❌ Error creating default admin user:", err)
+          );
+      }
+    });
   })
   .catch((err) => {
     console.error("Connection error:", err);
@@ -94,6 +100,7 @@ app.get("/", (req, res) => {
 require("./app/routes/auth.route")(app); // Tambahkan rute autentikasi
 require("./app/routes/product.route")(app);
 require("./app/routes/order.route")(app);
+require("./app/routes/user.route")(app); // User profile routes
 
 app.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);

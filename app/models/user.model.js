@@ -6,24 +6,54 @@ module.exports = (mongoose) => {
         type: String,
         required: true,
         unique: true,
-        trim: true, // Hapus spasi di awal/akhir
+        trim: true,
       },
       email: {
         type: String,
         required: true,
         unique: true,
         trim: true,
-        lowercase: true, // Simpan email dalam huruf kecil
-        match: [/.+\@.+\..+/, "Please fill a valid email address"], // Validasi format email
+        lowercase: true,
+        match: [/.+\@.+\..+/, "Please fill a valid email address"],
       },
       password: {
         type: String,
         required: true,
       },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      phone: {
+        type: String,
+        trim: true,
+      },
       roles: [
         {
-          type: String, // Contoh: "user", "admin"
+          type: String,
           default: "user",
+        },
+      ],
+      isActive: {
+        type: Boolean,
+        default: true,
+      },
+      addresses: [
+        {
+          type: {
+            type: String,
+            enum: ["home", "office", "other"],
+            default: "home",
+          },
+          street: String,
+          city: String,
+          state: String,
+          zipCode: String,
+          isDefault: {
+            type: Boolean,
+            default: false,
+          },
         },
       ],
     },

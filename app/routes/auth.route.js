@@ -9,8 +9,5 @@ module.exports = (app) => {
   // Route untuk login
   router.post("/signin", authController.signin);
 
-  // Route untuk demo login
-  router.post("/demo-login", authController.demoLogin);
-
   app.use("/api/auth", router);
 };
