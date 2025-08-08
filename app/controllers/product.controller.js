@@ -2,6 +2,80 @@ const db = require("../models");
 const Product = db.products;
 const path = require("path");
 const fs = require("fs").promises; // Use promises version for better performance
+const mongoose = require("mongoose");
+
+// Import admin controller untuk activity logging
+const { addActivity } = require("./admin.controller");
+
+// Enhanced error handling helper
+function handleControllerError(error, res, functionName) {
+  console.error(`❌ Error in ${functionName}:`, error);
+
+  // Handle validation errors
+  if (error.name === "ValidationError") {
+    const validationErrors = Object.values(error.errors).map(
+      (err) => err.message
+    );
+    return res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: validationErrors,
+      errorType: "validation",
+    });
+  }
+
+  // Handle cast errors (invalid ObjectId, etc.)
+  if (error.name === "CastError") {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid ${error.path}: ${error.value}`,
+      errorType: "cast",
+    });
+  }
+
+  // Handle duplicate key errors
+  if (error.code === 11000) {
+    const field = Object.keys(error.keyValue)[0];
+    const value = error.keyValue[field];
+    return res.status(409).json({
+      success: false,
+      message: `${field} '${value}' already exists`,
+      errorType: "duplicate",
+      field,
+      value,
+    });
+  }
+
+  // Handle MongoDB errors
+  if (error.name === "MongoError" || error.name === "MongoServerError") {
+    return res.status(500).json({
+      success: false,
+      message: "Database operation failed",
+      errorType: "database",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+
+  // Handle file system errors
+  if (error.code && error.code.startsWith("E")) {
+    return res.status(500).json({
+      success: false,
+      message: "File system operation failed",
+      errorType: "filesystem",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+
+  // Default error handler
+  return res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    errorType: "internal",
+    details: process.env.NODE_ENV === "development" ? error.message : undefined,
+  });
+}
 
 // Input validation helper
 function validateProductData(data) {
@@ -100,32 +174,80 @@ exports.findOne = async (req, res) => {
 
 // --- CREATE OPERATION ---
 
-// Fungsi untuk membuat produk baru (with better validation)
+// Enhanced product creation with comprehensive validation and logging
 exports.create = async (req, res) => {
   try {
-    // Validate input
+    const adminId = req.userId;
+    console.log(`📦 Admin ${adminId} creating new product:`, req.body.name);
+
+    // Enhanced input validation
     const validationErrors = validateProductData(req.body);
     if (validationErrors.length > 0) {
       // Clean up uploaded file if validation fails
       if (req.file) {
         await fs.unlink(req.file.path).catch(console.error);
       }
-      return res.status(400).send({
+      return res.status(400).json({
+        success: false,
         message: "Validation failed",
         errors: validationErrors,
+        errorType: "validation",
       });
     }
 
-    // Determine imageUrl
+    // Check for duplicate product code
+    const existingProduct = await Product.findOne({
+      code: req.body.code.trim(),
+    });
+    if (existingProduct) {
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(console.error);
+      }
+      return res.status(409).json({
+        success: false,
+        message: `Product with code '${req.body.code}' already exists`,
+        errorType: "duplicate",
+        field: "code",
+        value: req.body.code,
+      });
+    }
+
+    // Enhanced image handling
     let imageUrlPath = "";
     if (req.file) {
+      // Validate file type and size
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        await fs.unlink(req.file.path).catch(console.error);
+        return res.status(400).json({
+          success: false,
+          message: "Invalid file type. Only JPEG, PNG, and WEBP are allowed",
+          errorType: "validation",
+        });
+      }
+
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (req.file.size > maxSize) {
+        await fs.unlink(req.file.path).catch(console.error);
+        return res.status(400).json({
+          success: false,
+          message: "File size too large. Maximum 5MB allowed",
+          errorType: "validation",
+        });
+      }
+
       imageUrlPath = `/uploads/${req.file.filename}`;
     } else if (req.body.imageUrl) {
       imageUrlPath = req.body.imageUrl;
     }
 
-    // Create product object
-    const product = new Product({
+    // Create product object with enhanced data
+    const productData = {
       code: req.body.code.trim(),
       name: req.body.name.trim(),
       price: parseFloat(req.body.price),
@@ -133,26 +255,49 @@ exports.create = async (req, res) => {
       imageUrl: imageUrlPath,
       averageRating: parseFloat(req.body.averageRating) || 0,
       stock: parseInt(req.body.stock) || 0,
-    });
+      createdBy: adminId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
+    const product = new Product(productData);
     const savedProduct = await product.save();
-    res.status(201).send(savedProduct);
-  } catch (err) {
+
+    // Enhanced activity logging
+    const activityId = addActivity(
+      "product",
+      `Produk "${savedProduct.name}" berhasil ditambahkan dengan kode ${savedProduct.code}`,
+      {
+        productId: savedProduct._id,
+        productCode: savedProduct.code,
+        productName: savedProduct.name,
+        price: savedProduct.price,
+        stock: savedProduct.stock,
+        adminId,
+        timestamp: new Date(),
+        actionType: "create",
+        severity: "info",
+        source: "admin_panel",
+      }
+    );
+
+    console.log(
+      `✅ Product created: ${savedProduct.code} by admin ${adminId} (Activity: ${activityId})`
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Product created successfully",
+      data: savedProduct,
+      activityId,
+    });
+  } catch (error) {
     // Clean up uploaded file if save fails
     if (req.file) {
       await fs.unlink(req.file.path).catch(console.error);
     }
 
-    if (err.code === 11000) {
-      return res.status(409).send({
-        message: `Product with code '${req.body.code}' already exists.`,
-      });
-    }
-
-    console.error("Error creating product:", err);
-    res.status(500).send({
-      message: err.message || "An error occurred while creating the product.",
-    });
+    return handleControllerError(error, res, "createProduct");
   }
 };
 
@@ -230,6 +375,17 @@ exports.update = async (req, res) => {
       });
     }
 
+    // Log activity untuk update produk
+    addActivity(
+      "product",
+      `Produk "${updatedProduct.name}" berhasil diperbarui`,
+      {
+        productCode: updatedProduct.code,
+        productName: updatedProduct.name,
+        changes: Object.keys(updateData),
+      }
+    );
+
     res
       .status(200)
       .send({ message: "Product updated successfully!", data: updatedProduct });
@@ -281,6 +437,12 @@ exports.delete = async (req, res) => {
           console.error("Failed to delete product image:", imagePath, err);
       });
     }
+
+    // Log activity untuk hapus produk
+    addActivity("product", `Produk "${deletedProduct.name}" berhasil dihapus`, {
+      productCode: deletedProduct.code,
+      productName: deletedProduct.name,
+    });
 
     res.status(200).send({ message: "Product deleted successfully!" });
   } catch (err) {

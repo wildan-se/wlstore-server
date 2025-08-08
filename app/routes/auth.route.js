@@ -9,5 +9,11 @@ module.exports = (app) => {
   // Route untuk login
   router.post("/signin", authController.signin);
 
+  // Route untuk lupa password
+  router.post("/forgot-password", authController.forgotPassword);
+
+  // Route untuk reset password
+  router.post("/reset-password", authController.resetPassword);
+
   app.use("/api/auth", router);
 };

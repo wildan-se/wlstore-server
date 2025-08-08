@@ -2,31 +2,53 @@
 module.exports = (app) => {
   const orders = require("../controllers/order.controller");
   const router = require("express").Router();
-  const { verifyToken } = require("../middleware/authJwt"); // Import middleware
+  const { authJwt } = require("../middleware"); // Import middleware
 
   // Rute untuk mendapatkan keranjang belanja pengguna (membutuhkan otentikasi)
-  router.get("/cart", [verifyToken], orders.findUserCart);
+  router.get("/cart", [authJwt.verifyToken], orders.findUserCart);
 
   // Rute untuk menambah/memperbarui item ke keranjang (membutuhkan otentikasi)
-  router.post("/cart/add", [verifyToken], orders.addToCart);
+  router.post("/cart/add", [authJwt.verifyToken], orders.addToCart);
 
   // Rute untuk memperbarui kuantitas item di keranjang (membutuhkan otentikasi)
   router.put(
     "/cart/update-quantity",
-    [verifyToken],
+    [authJwt.verifyToken],
     orders.updateCartItemQuantity
   );
 
   // Rute untuk menghapus item dari keranjang (membutuhkan otentikasi)
-  router.post("/cart/remove", [verifyToken], orders.removeFromCart);
-  // Atau jika Anda ingin menggunakan DELETE method:
-  // router.delete("/cart/remove/:productCode", [verifyToken], orders.removeFromCart);
+  router.post("/cart/remove", [authJwt.verifyToken], orders.removeFromCart);
 
-  // Rute lain yang mungkin sudah ada (misalnya untuk manajemen pesanan admin)
-  // router.get("/", orders.findAll); // Contoh: untuk admin melihat semua order
-  // router.get("/:id", orders.findOne); // Contoh: untuk admin melihat detail order
-  // router.put("/:id", orders.update); // Contoh: untuk admin mengubah status order
-  // router.delete("/:id", orders.delete); // Contoh: untuk admin menghapus order
+  // === ADMIN ROUTES FOR ORDER MANAGEMENT ===
+
+  // Admin: Get all orders with pagination and filtering
+  router.get(
+    "/admin/all",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    orders.getAllOrders
+  );
+
+  // Admin: Get order statistics
+  router.get(
+    "/admin/stats",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    orders.getOrderStats
+  );
+
+  // Admin: Update order status
+  router.put(
+    "/admin/:orderId/status",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    orders.updateOrderStatus
+  );
+
+  // Admin: Delete order
+  router.delete(
+    "/admin/:orderId",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    orders.deleteOrder
+  );
 
   app.use("/api/orders", router);
 };
