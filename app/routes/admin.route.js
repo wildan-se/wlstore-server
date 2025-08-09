@@ -35,6 +35,13 @@ module.exports = function (app) {
     adminController.getRecentActivities
   );
 
+  // Get all users for admin management
+  app.get(
+    "/api/admin/users",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    adminController.getAllUsers
+  );
+
   // Real-time order activities
   app.get(
     "/api/admin/order-activities",

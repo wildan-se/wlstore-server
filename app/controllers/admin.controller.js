@@ -724,6 +724,35 @@ exports.getSystemStatus = async (req, res) => {
   }
 };
 
+// Get all users for admin management
+exports.getAllUsers = async (req, res) => {
+  try {
+    console.log("🔍 Admin users endpoint called");
+
+    const users = await User.find(
+      {},
+      {
+        password: 0, // Exclude password field
+        __v: 0,
+      }
+    ).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: users,
+      total: users.length,
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching users",
+      error: error.message,
+    });
+  }
+};
+
 // Export functions
 exports.healthCheck = healthCheck;
 exports.getDashboardData = getDashboardData;
